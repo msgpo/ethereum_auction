@@ -212,33 +212,38 @@ function saveProductToBlockchain(params, imageId, descId) {
 
 function renderProductDetails(productId) {
  EcommerceStore.deployed().then(function(i) {
-  i.getProduct.call(productId).then(function(p) {
-   console.log(p);
-   let content = "";
-   ipfs.cat(p[4]).then(function(stream) {
-    stream.on('data', function(chunk) {
-    // do stuff with this chunk of data
-    content += chunk.toString();
-    $("#product-desc").append("<div>" + content+ "</div>");
-    })
-   });
-
-   $("#product-image").append("<img src='https://ipfs.io/ipfs/" + p[3] + "' width='250px' />");
-   $("#product-price").html(displayPrice(p[7]));
-   $("#product-name").html(p[1].name);
-   $("#product-auction-end").html(displayEndHours(p[6]));
-   $("#product-id").val(p[0]);
-   $("#revealing, #bidding").hide();
-   let currentTime = getCurrentTimeInSeconds();
-   if(currentTime < p[6]) {
-    $("#bidding").show();
-   } else if (currentTime - (60) < p[6]) {
-    $("#revealing").show();
-   }
+ i.getProduct.call(productId).then(function(p) {
+  console.log(p);
+  let content = "";
+  ipfs.cat(p[4]).then(function(stream) {
+  stream.on('data', function(chunk) {
+  // do stuff with this chunk of data
+  content += chunk.toString();
+  $("#product-desc").append("<div>" + content+ "</div>");
   })
+  });
+
+  $("#product-image").append("<img src='https://ipfs.io/ipfs/" + p[3] + "' width='250px' />");
+  $("#product-price").html(displayPrice(p[7]));
+  $("#product-name").html(p[1].name);
+  $("#product-auction-end").html(displayEndHours(p[6]));
+  $("#product-id").val(p[0]);
+  $("#revealing, #bidding, #finalize-auction, #escrow-info").hide();
+  let currentTime = getCurrentTimeInSeconds();
+   if (parseInt(p[8]) == 1) {
+  $("#product-status").html("Product sold");
+  } else if(parseInt(p[8]) == 2) {
+  $("#product-status").html("Product was not sold");
+  } else if(currentTime < parseInt(p[6])) {
+  $("#bidding").show();
+  } else if (currentTime < (parseInt(p[6]) + 600)) {
+  $("#revealing").show();
+  } else {
+  $("#finalize-auction").show();
+  }
+ })
  })
 }
-
 
 function getCurrentTimeInSeconds(){
  return Math.round(new Date() / 1000);
