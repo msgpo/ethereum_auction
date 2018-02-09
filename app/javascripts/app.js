@@ -21,13 +21,90 @@ window.App = {
   var self = this;
   var reader;
 
-  if($("#product-details").length > 0) {
+  EcommerceStore.setProvider(web3.currentProvider);
+  renderStore();
+
+ $("#product-image").change(function(event) {
+    const file = event.target.files[0]
+    reader = new window.FileReader()
+    reader.readAsArrayBuffer(file)
+  });
+
+  $("#add-item-to-store").submit(function(event) {
+   const req = $("#add-item-to-store").serialize();
+   let params = JSON.parse('{"' + req.replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
+   let decodedParams = {}
+   Object.keys(params).forEach(function(v) {
+    decodedParams[v] = decodeURIComponent(decodeURI(params[v]));
+   });
+   saveProduct(reader, decodedParams);
+   event.preventDefault();
+});
+
+if($("#product-details").length > 0) {
    //This is product details page
    let productId = new URLSearchParams(window.location.search).get('id');
    renderProductDetails(productId);
   }
 
-   $("#release-funds").click(function() {
+$("#bidding").submit(function(event) {
+   $("#msg").hide();
+   let amount = $("#bid-amount").val();
+   let sendAmount = $("#bid-send-amount").val();
+   let secretText = $("#secret-text").val();
+   let sealedBid = '0x' + ethUtil.sha3(web3.toWei(amount, 'ether') + secretText).toString('hex');
+   let productId = $("#product-id").val();
+   console.log(sealedBid + " for " + productId);
+   EcommerceStore.deployed().then(function(i) {
+    i.bid(parseInt(productId), sealedBid, {value: web3.toWei(sendAmount), from: web3.eth.accounts[1], gas: 440000}).then(
+     function(f) {
+      $("#msg").html("Your bid has been successfully submitted!");
+      $("#msg").show();
+      console.log(f)
+     }
+    )
+   });
+   event.preventDefault();
+});
+
+$("#revealing").submit(function(event) {
+   $("#msg").hide();
+   let amount = $("#actual-amount").val();
+   let secretText = $("#reveal-secret-text").val();
+   let productId = $("#product-id").val();
+   EcommerceStore.deployed().then(function(i) {
+    i.revealBid(parseInt(productId), web3.toWei(amount).toString(), secretText, {from: web3.eth.accounts[1], gas: 440000}).then(
+     function(f) {
+      $("#msg").show();
+      $("#msg").html("Your bid has been successfully revealed!");
+      console.log(f)
+     }
+    )
+   });
+   event.preventDefault();
+});
+
+$("#finalize-auction").submit(function(event) {
+  $("#msg").hide();
+  let productId = $("#product-id").val();
+  EcommerceStore.deployed().then(function(i) {
+  i.finalizeAuction(parseInt(productId), {from: web3.eth.accounts[2], gas: 4400000}).then(
+   function(f) {
+   $("#msg").show();
+   $("#msg").html("The auction has been finalized and winner declared.");
+   console.log(f)
+   location.reload();
+   }
+  ).catch(function(e) {
+   console.log(e);
+   $("#msg").show();
+   $("#msg").html("The auction can not be finalized by the buyer or seller, only a third party aribiter can finalize it");
+  })
+  });
+  event.preventDefault();
+});
+
+$("#release-funds").click(function() {
    let productId = new URLSearchParams(window.location.search).get('id');
    EcommerceStore.deployed().then(function(f) {
     $("#msg").html("Your transaction has been submitted. Please wait for few seconds for the confirmation").show();
@@ -55,86 +132,33 @@ window.App = {
 
    alert("refund the funds!");
   });
-
-  $("#product-image").change(function(event) {
-    const file = event.target.files[0]
-    reader = new window.FileReader()
-    reader.readAsArrayBuffer(file)
-  });
   
-  $("#add-item-to-store").submit(function(event) {
-   const req = $("#add-item-to-store").serialize();
-   let params = JSON.parse('{"' + req.replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
-   let decodedParams = {}
-   Object.keys(params).forEach(function(v) {
-    decodedParams[v] = decodeURIComponent(decodeURI(params[v]));
-   });
-   saveProduct(reader, decodedParams);
-   event.preventDefault();
-  });
-
-  $("#bidding").submit(function(event) {
-   $("#msg").hide();
-   let amount = $("#bid-amount").val();
-   let sendAmount = $("#bid-send-amount").val();
-   let secretText = $("#secret-text").val();
-   let sealedBid = '0x' + ethUtil.sha3(web3.toWei(amount, 'ether') + secretText).toString('hex');
-   let productId = $("#product-id").val();
-   console.log(sealedBid + " for " + productId);
-   EcommerceStore.deployed().then(function(i) {
-    i.bid(parseInt(productId), sealedBid, {value: web3.toWei(sendAmount), from: web3.eth.accounts[1], gas: 440000}).then(
-     function(f) {
-      $("#msg").html("Your bid has been successfully submitted!");
-      $("#msg").show();
-      console.log(f)
-     }
-    )
-   });
-   event.preventDefault();
-  });
-
-  $("#revealing").submit(function(event) {
-   $("#msg").hide();
-   let amount = $("#actual-amount").val();
-   let secretText = $("#reveal-secret-text").val();
-   let productId = $("#product-id").val();
-   EcommerceStore.deployed().then(function(i) {
-    i.revealBid(parseInt(productId), web3.toWei(amount).toString(), secretText, {from: web3.eth.accounts[1], gas: 440000}).then(
-     function(f) {
-      $("#msg").show();
-      $("#msg").html("Your bid has been successfully revealed!");
-      console.log(f)
-     }
-    )
-   });
-   event.preventDefault();
-  });
-
-  $("#finalize-auction").submit(function(event) {
-  $("#msg").hide();
-  let productId = $("#product-id").val();
-  EcommerceStore.deployed().then(function(i) {
-  i.finalizeAuction(parseInt(productId), {from: web3.eth.accounts[2], gas: 4400000}).then(
-   function(f) {
-   $("#msg").show();
-   $("#msg").html("The auction has been finalized and winner declared.");
-   console.log(f)
-   location.reload();
-   }
-  ).catch(function(e) {
-   console.log(e);
-   $("#msg").show();
-   $("#msg").html("The auction can not be finalized by the buyer or seller, only a third party aribiter can finalize it");
-  })
-  });
-  event.preventDefault();
- });
-
-  EcommerceStore.setProvider(web3.currentProvider);
-  renderStore();
- }
+ },
 
 };
+
+function renderStore() {
+ EcommerceStore.deployed().then(function(i) {
+  i.getProduct.call(1).then(function(p) {
+   $("#product-list").append(buildProduct(p));
+  });
+  i.getProduct.call(2).then(function(p) {
+   $("#product-list").append(buildProduct(p));
+  });
+ });
+}
+
+function buildProduct(product) {
+ let node = $("<div/>");
+ node.addClass("col-sm-3 text-center col-margin-bottom-1");
+ node.append("<img src='https://ipfs.io/ipfs/" + product[3] + "' width='150px' />");
+ node.append("<div>" + product[1]+ "</div>");
+ node.append("<div>" + product[2]+ "</div>");
+ node.append("<div>" + product[5]+ "</div>");
+ node.append("<div>" + product[6]+ "</div>");
+ node.append("<div>Ether " + product[7] + "</div>");
+ return node;
+}
 
 function saveImageOnIpfs(reader) {
  return new Promise(function(resolve, reject) {
@@ -162,52 +186,6 @@ function saveTextBlobOnIpfs(blob) {
    reject(err);
   })
  })
-}
-
-function renderProducts(div, filters) {
- $.ajax({
-  url: offchainServer + "/products",
-  type: 'get',
-  contentType: "application/json; charset=utf-8",
-  data: filters
- }).done(function(data) {
-  if (data.length == 0) {
-   $("#" + div).html('No products found');
-  } else {
-   $("#" + div).html('');
-  }
-  while(data.length > 0) {
-   let chunks = data.splice(0, 4);
-   let row = $("<div/>");
-   row.addClass("row");
-   chunks.forEach(function(value) {
-    let node = buildProduct(value);
-    row.append(node);
-   })
-   $("#" + div).append(row);
-  }
- })
-}
-
-function renderStore() {
- renderProducts("product-list", {});
- renderProducts("product-reveal-list", {productStatus: "reveal"});
- renderProducts("product-finalize-list", {productStatus: "finalize"});
- categories.forEach(function(value) {
-  $("#categories").append("<div>" + value + "");
- })
-}
-
-function buildProduct(product) {
- let node = $("<div/>");
- node.addClass("col-sm-3 text-center col-margin-bottom-1");
- node.append("<img src='https://ipfs.io/ipfs/" + product[3] + "' width='150px' />");
- node.append("<div>" + product[1]+ "</div>");
- node.append("<div>" + product[2]+ "</div>");
- node.append("<div>" + product[5]+ "</div>");
- node.append("<div>" + product[6]+ "</div>");
- node.append("<div>Ether " + product[7] + "</div>");
- return node;
 }
 
 function saveProduct(reader, decodedParams) {
@@ -293,6 +271,7 @@ function renderProductDetails(productId) {
  })
 }
 
+
 function getCurrentTimeInSeconds(){
  return Math.round(new Date() / 1000);
 }
@@ -328,6 +307,40 @@ function displayEndHours(seconds) {
  } else {
   return "Auction ends in " + remaining_seconds + " seconds";
  }
+}
+
+function renderProducts(div, filters) {
+ $.ajax({
+  url: offchainServer + "/products",
+  type: 'get',
+  contentType: "application/json; charset=utf-8",
+  data: filters
+ }).done(function(data) {
+  if (data.length == 0) {
+   $("#" + div).html('No products found');
+  } else {
+   $("#" + div).html('');
+  }
+  while(data.length > 0) {
+   let chunks = data.splice(0, 4);
+   let row = $("<div/>");
+   row.addClass("row");
+   chunks.forEach(function(value) {
+    let node = buildProduct(value);
+    row.append(node);
+   })
+   $("#" + div).append(row);
+  }
+ })
+}
+
+function renderStore() {
+ renderProducts("product-list", {});
+ renderProducts("product-reveal-list", {productStatus: "reveal"});
+ renderProducts("product-finalize-list", {productStatus: "finalize"});
+ categories.forEach(function(value) {
+  $("#categories").append("<div>" + value + "");
+ })
 }
 
 window.addEventListener('load', function() {
